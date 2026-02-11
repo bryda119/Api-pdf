@@ -1,0 +1,23 @@
+{
+  "name": "unir-pdfs",
+  "version": "1.0.0",
+  "description": "API REST para unir múltiples PDFs en uno solo con Swagger",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "unir": "node unir-pdfs.js"
+  },
+  "keywords": ["pdf", "merge", "unir", "api", "swagger"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "swagger-ui-express": "^5.0.0",
+    "swagger-jsdoc": "^6.2.8",
+    "cors": "^2.8.5",
+    "sharp": "^0.33.0"
+  }
+}
