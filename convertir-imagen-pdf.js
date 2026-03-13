@@ -1,5 +1,7 @@
 const { PDFDocument, rgb } = require('pdf-lib');
 const fs = require('fs');
+const sharp = require('sharp');
+const path = require('path');
 
 // Dimensiones A4 en puntos (1 punto = 1/72 pulgadas)
 // A4: 210mm x 297mm = 595.28 x 841.89 puntos
@@ -27,31 +29,50 @@ async function convertirImagenAPdf(rutaImagen, rutaSalida = null, opciones = {})
       margen = MARGIN
     } = opciones;
 
-    // Leer la imagen
-    const bytesImagen = fs.readFileSync(rutaImagen);
-    
     // Crear un nuevo documento PDF
     const pdf = await PDFDocument.create();
     
-    // Determinar el tipo de imagen por extensión o contenido
-    const extension = rutaImagen.toLowerCase();
-    let imagenEmbed;
+    // Leer y convertir la imagen usando Sharp (soporta múltiples formatos)
+    let imagenBuffer;
+    let esPng = false;
     
-    if (extension.endsWith('.png')) {
-      imagenEmbed = await pdf.embedPng(bytesImagen);
-    } else if (extension.endsWith('.jpg') || extension.endsWith('.jpeg')) {
-      imagenEmbed = await pdf.embedJpg(bytesImagen);
-    } else {
-      // Intentar detectar automáticamente
-      try {
-        imagenEmbed = await pdf.embedPng(bytesImagen);
-      } catch (error) {
-        try {
-          imagenEmbed = await pdf.embedJpg(bytesImagen);
-        } catch (error2) {
-          throw new Error('Formato de imagen no soportado. Use PNG o JPEG.');
-        }
+    try {
+      // Usar Sharp para convertir cualquier formato de imagen a PNG o JPEG
+      const extension = path.extname(rutaImagen).toLowerCase();
+      
+      // Para formatos que Sharp puede convertir directamente
+      const imagenSharp = sharp(rutaImagen);
+      const metadata = await imagenSharp.metadata();
+      
+      // Convertir a PNG para mejor compatibilidad (soporta transparencia)
+      // O JPEG si es más eficiente para fotos
+      if (extension === '.jpg' || extension === '.jpeg' || 
+          metadata.format === 'jpeg' || metadata.format === 'jpg') {
+        // Si ya es JPEG, mantenerlo como JPEG
+        imagenBuffer = await imagenSharp.jpeg({ quality: 95 }).toBuffer();
+        esPng = false;
+      } else {
+        // Para otros formatos (PNG, GIF, BMP, TIFF, WEBP, etc.), convertir a PNG
+        imagenBuffer = await imagenSharp.png({ quality: 100 }).toBuffer();
+        esPng = true;
       }
+    } catch (error) {
+      // Si Sharp falla, intentar leer directamente (para PNG/JPEG nativos)
+      try {
+        imagenBuffer = fs.readFileSync(rutaImagen);
+        const extension = rutaImagen.toLowerCase();
+        esPng = extension.endsWith('.png');
+      } catch (readError) {
+        throw new Error(`Error al procesar la imagen: ${error.message}. Formato no soportado.`);
+      }
+    }
+    
+    // Embed la imagen en el PDF
+    let imagenEmbed;
+    if (esPng) {
+      imagenEmbed = await pdf.embedPng(imagenBuffer);
+    } else {
+      imagenEmbed = await pdf.embedJpg(imagenBuffer);
     }
     
     // Obtener dimensiones originales de la imagen

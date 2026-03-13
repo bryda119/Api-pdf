@@ -4,7 +4,7 @@
 [![Express](https://img.shields.io/badge/Express-4.18-blue.svg)](https://expressjs.com/)
 [![License](https://img.shields.io/badge/License-ISC-yellow.svg)](LICENSE)
 
-API REST desarrollada con Node.js y Express que permite unir múltiples archivos PDF e imágenes (PNG, JPEG) en un solo documento PDF. Incluye documentación interactiva con Swagger para facilitar las pruebas y el uso de la API.
+API REST desarrollada con Node.js y Express que permite unir múltiples archivos PDF e imágenes en todos los formatos comunes (PNG, JPEG, GIF, BMP, WEBP, TIFF, ICO, SVG, HEIC, HEIF, AVIF) en un solo documento PDF. Incluye documentación interactiva con Swagger para facilitar las pruebas y el uso de la API.
 
 ## 👨‍💻 Creador
 
@@ -19,7 +19,7 @@ Esta API REST está diseñada para **simplificar y automatizar la gestión de do
 ### Funcionalidades principales:
 
 - **Combinar múltiples PDFs** en un solo documento manteniendo todas las páginas
-- **Convertir imágenes a PDF** automáticamente en formato A4 (PNG, JPEG)
+- **Convertir imágenes a PDF** automáticamente en formato A4 (soporta todos los formatos de imagen comunes: PNG, JPEG, GIF, BMP, WEBP, TIFF, ICO, SVG, HEIC, HEIF, AVIF)
 - **Mezclar PDFs e imágenes** en un solo archivo en cualquier orden
 - **Automatizar la creación de documentos** combinados desde aplicaciones web, móviles o sistemas empresariales
 - **Procesar documentos** de forma programática mediante una API REST estándar
@@ -105,7 +105,7 @@ Esta API es especialmente útil para:
 - ✅ **API REST** con Express.js
 - ✅ **Documentación interactiva** con Swagger UI
 - ✅ **Unión de múltiples PDFs** preservando todas las páginas
-- ✅ **Conversión automática de imágenes** (PNG, JPEG) a PDF en formato A4
+- ✅ **Conversión automática de imágenes** (todos los formatos comunes) a PDF en formato A4
 - ✅ **Mezcla de PDFs e imágenes** en una sola solicitud
 - ✅ **Escalado inteligente**: Las imágenes se ajustan a A4 manteniendo su proporción
 - ✅ **Centrado automático** de imágenes en páginas A4
@@ -210,11 +210,13 @@ curl -X POST "http://localhost:3000/api/unir-pdfs" \
   -F "nombreSalida=resultado.pdf" \
   --output resultado.pdf
 
-# Unir PDFs e imágenes
+# Unir PDFs e imágenes (soporta múltiples formatos)
 curl -X POST "http://localhost:3000/api/unir-pdfs" \
   -F "archivos=@documento.pdf" \
   -F "archivos=@imagen1.png" \
   -F "archivos=@imagen2.jpg" \
+  -F "archivos=@imagen3.gif" \
+  -F "archivos=@imagen4.webp" \
   -F "nombreSalida=resultado.pdf" \
   --output resultado.pdf
 ```
@@ -294,7 +296,7 @@ Información general de la API.
   "version": "1.0.0",
   "documentacion": "/api-docs",
   "endpoint": "/api/unir-pdfs",
-  "formatosSoportados": ["PDF", "PNG", "JPEG", "JPG"]
+  "formatosSoportados": ["PDF", "PNG", "JPEG", "JPG", "GIF", "BMP", "WEBP", "TIFF", "ICO", "SVG", "HEIC", "HEIF", "AVIF"]
 }
 ```
 
@@ -309,8 +311,18 @@ Une múltiples archivos PDF e imágenes en un solo PDF.
 - `nombreSalida` (string, opcional): Nombre del archivo PDF resultante (por defecto: "pdf-unido.pdf")
 
 **Formatos soportados:**
-- PDF: `application/pdf`
-- Imágenes: `image/png`, `image/jpeg`, `image/jpg`
+- **PDF**: `application/pdf`
+- **Imágenes**: Todos los formatos comunes de imagen:
+  - PNG: `image/png`
+  - JPEG/JPG: `image/jpeg`, `image/jpg`
+  - GIF: `image/gif`
+  - BMP: `image/bmp`
+  - WEBP: `image/webp`
+  - TIFF: `image/tiff`, `image/tif`
+  - ICO: `image/x-icon`, `image/vnd.microsoft.icon`
+  - SVG: `image/svg+xml`
+  - HEIC/HEIF: `image/heic`, `image/heif` (formato Apple)
+  - AVIF: `image/avif`
 
 **Límites:**
 - Tamaño máximo por archivo: 50MB
@@ -330,6 +342,443 @@ Descarga un PDF generado previamente.
 
 **Parámetros:**
 - `nombreArchivo` (path parameter): Nombre del archivo PDF a descargar
+
+## 🔌 Integración en Otros Sistemas
+
+Esta sección muestra cómo integrar la API en diferentes lenguajes y frameworks para descargar el archivo PDF resultante.
+
+### 📥 Formas de Obtener el PDF
+
+La API ofrece dos formas de obtener el PDF:
+
+1. **Descarga directa** (por defecto): El PDF se envía como binario en la respuesta
+2. **Respuesta JSON** (usando `?formato=json`): Devuelve información y URL de descarga
+
+### JavaScript/Node.js (Backend)
+
+#### Opción 1: Descarga directa del PDF
+
+```javascript
+const axios = require('axios');
+const FormData = require('form-data');
+const fs = require('fs');
+
+async function unirPdfsYDescargar() {
+  const formData = new FormData();
+  formData.append('archivos', fs.createReadStream('archivo1.pdf'));
+  formData.append('archivos', fs.createReadStream('imagen1.png'));
+  formData.append('nombreSalida', 'resultado.pdf');
+
+  try {
+    const response = await axios.post('http://localhost:3000/api/unir-pdfs', formData, {
+      headers: formData.getHeaders(),
+      responseType: 'arraybuffer' // Importante para archivos binarios
+    });
+
+    // Guardar el PDF directamente
+    fs.writeFileSync('resultado.pdf', response.data);
+    console.log('✅ PDF descargado exitosamente!');
+  } catch (error) {
+    console.error('❌ Error:', error.response?.data || error.message);
+  }
+}
+
+unirPdfsYDescargar();
+```
+
+#### Opción 2: Obtener información JSON y luego descargar
+
+```javascript
+const axios = require('axios');
+const FormData = require('form-data');
+const fs = require('fs');
+
+async function unirPdfsConInfo() {
+  const formData = new FormData();
+  formData.append('archivos', fs.createReadStream('archivo1.pdf'));
+  formData.append('archivos', fs.createReadStream('imagen1.png'));
+  formData.append('nombreSalida', 'resultado.pdf');
+
+  try {
+    // Obtener información en JSON
+    const response = await axios.post(
+      'http://localhost:3000/api/unir-pdfs?formato=json',
+      formData,
+      {
+        headers: formData.getHeaders()
+      }
+    );
+
+    console.log('Información:', response.data);
+    // response.data contiene: mensaje, archivo, totalPaginas, urlDescarga, tamaño
+
+    // Descargar el archivo usando la URL proporcionada
+    const downloadResponse = await axios.get(
+      `http://localhost:3000${response.data.urlDescarga}`,
+      { responseType: 'arraybuffer' }
+    );
+
+    fs.writeFileSync(response.data.archivo, downloadResponse.data);
+    console.log(`✅ PDF descargado: ${response.data.archivo} (${response.data.totalPaginas} páginas)`);
+  } catch (error) {
+    console.error('❌ Error:', error.response?.data || error.message);
+  }
+}
+
+unirPdfsConInfo();
+```
+
+### JavaScript (Frontend/Browser)
+
+```javascript
+async function unirPdfsDesdeNavegador() {
+  const formData = new FormData();
+  formData.append('archivos', fileInput1.files[0]);
+  formData.append('archivos', fileInput2.files[0]);
+  formData.append('nombreSalida', 'resultado.pdf');
+
+  try {
+    const response = await fetch('http://localhost:3000/api/unir-pdfs', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Error al procesar');
+    }
+
+    // Convertir respuesta a blob
+    const blob = await response.blob();
+    
+    // Crear URL temporal y descargar
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'resultado.pdf'; // O usar el nombre del header Content-Disposition
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    
+    console.log('✅ PDF descargado exitosamente!');
+  } catch (error) {
+    console.error('❌ Error:', error);
+    alert('Error al unir PDFs: ' + error.message);
+  }
+}
+```
+
+### Python
+
+```python
+import requests
+
+def unir_pdfs_y_descargar():
+    url = 'http://localhost:3000/api/unir-pdfs'
+    
+    # Preparar archivos
+    files = [
+        ('archivos', ('archivo1.pdf', open('archivo1.pdf', 'rb'), 'application/pdf')),
+        ('archivos', ('imagen1.png', open('imagen1.png', 'rb'), 'image/png')),
+    ]
+    
+    data = {
+        'nombreSalida': 'resultado.pdf'
+    }
+    
+    try:
+        # Enviar solicitud
+        response = requests.post(url, files=files, data=data)
+        response.raise_for_status()
+        
+        # Guardar el PDF
+        with open('resultado.pdf', 'wb') as f:
+            f.write(response.content)
+        
+        print('✅ PDF descargado exitosamente!')
+    except requests.exceptions.RequestException as e:
+        print(f'❌ Error: {e}')
+
+# Ejecutar
+unir_pdfs_y_descargar()
+```
+
+### Python con información JSON
+
+```python
+import requests
+
+def unir_pdfs_con_info():
+    url = 'http://localhost:3000/api/unir-pdfs?formato=json'
+    
+    files = [
+        ('archivos', ('archivo1.pdf', open('archivo1.pdf', 'rb'), 'application/pdf')),
+        ('archivos', ('imagen1.png', open('imagen1.png', 'rb'), 'image/png')),
+    ]
+    
+    data = {'nombreSalida': 'resultado.pdf'}
+    
+    try:
+        # Obtener información
+        response = requests.post(url, files=files, data=data)
+        response.raise_for_status()
+        info = response.json()
+        
+        print(f"Archivo: {info['archivo']}")
+        print(f"Páginas: {info['totalPaginas']}")
+        print(f"Tamaño: {info['tamaño']} bytes")
+        
+        # Descargar usando la URL proporcionada
+        download_url = f"http://localhost:3000{info['urlDescarga']}"
+        download_response = requests.get(download_url)
+        download_response.raise_for_status()
+        
+        with open(info['archivo'], 'wb') as f:
+            f.write(download_response.content)
+        
+        print('✅ PDF descargado exitosamente!')
+    except requests.exceptions.RequestException as e:
+        print(f'❌ Error: {e}')
+
+unir_pdfs_con_info()
+```
+
+### PHP
+
+```php
+<?php
+function unirPdfsYDescargar() {
+    $url = 'http://localhost:3000/api/unir-pdfs';
+    
+    $files = [
+        'archivos' => [
+            new CURLFile('archivo1.pdf', 'application/pdf', 'archivo1.pdf'),
+            new CURLFile('imagen1.png', 'image/png', 'imagen1.png')
+        ],
+        'nombreSalida' => 'resultado.pdf'
+    ];
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $files);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode === 200) {
+        file_put_contents('resultado.pdf', $response);
+        echo "✅ PDF descargado exitosamente!\n";
+    } else {
+        echo "❌ Error: " . $response . "\n";
+    }
+}
+
+unirPdfsYDescargar();
+?>
+```
+
+### Java (Spring Boot)
+
+```java
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.http.*;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
+
+public class PdfMergerClient {
+    private static final String API_URL = "http://localhost:3000/api/unir-pdfs";
+    
+    public void unirPdfsYDescargar() {
+        RestTemplate restTemplate = new RestTemplate();
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("archivos", new FileSystemResource("archivo1.pdf"));
+        body.add("archivos", new FileSystemResource("imagen1.png"));
+        body.add("nombreSalida", "resultado.pdf");
+        
+        HttpEntity<MultiValueMap<String, Object>> requestEntity = 
+            new HttpEntity<>(body, headers);
+        
+        ResponseEntity<byte[]> response = restTemplate.exchange(
+            API_URL,
+            HttpMethod.POST,
+            requestEntity,
+            byte[].class
+        );
+        
+        if (response.getStatusCode() == HttpStatus.OK) {
+            // Guardar el PDF
+            Files.write(Paths.get("resultado.pdf"), response.getBody());
+            System.out.println("✅ PDF descargado exitosamente!");
+        } else {
+            System.out.println("❌ Error: " + response.getStatusCode());
+        }
+    }
+}
+```
+
+### C# (.NET)
+
+```csharp
+using System;
+using System.IO;
+using System.Net.Http;
+using System.Threading.Tasks;
+
+public class PdfMergerClient
+{
+    private static readonly string ApiUrl = "http://localhost:3000/api/unir-pdfs";
+    
+    public async Task UnirPdfsYDescargar()
+    {
+        using (var client = new HttpClient())
+        using (var formData = new MultipartFormDataContent())
+        {
+            // Agregar archivos
+            var file1Content = new ByteArrayContent(File.ReadAllBytes("archivo1.pdf"));
+            file1Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+            formData.Add(file1Content, "archivos", "archivo1.pdf");
+            
+            var file2Content = new ByteArrayContent(File.ReadAllBytes("imagen1.png"));
+            file2Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+            formData.Add(file2Content, "archivos", "imagen1.png");
+            
+            // Agregar nombre de salida
+            formData.Add(new StringContent("resultado.pdf"), "nombreSalida");
+            
+            try
+            {
+                var response = await client.PostAsync(ApiUrl, formData);
+                response.EnsureSuccessStatusCode();
+                
+                // Guardar el PDF
+                var pdfBytes = await response.Content.ReadAsByteArrayAsync();
+                File.WriteAllBytes("resultado.pdf", pdfBytes);
+                
+                Console.WriteLine("✅ PDF descargado exitosamente!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error: {ex.Message}");
+            }
+        }
+    }
+}
+```
+
+### cURL (Línea de comandos)
+
+```bash
+# Descarga directa del PDF
+curl -X POST "http://localhost:3000/api/unir-pdfs" \
+  -F "archivos=@archivo1.pdf" \
+  -F "archivos=@imagen1.png" \
+  -F "nombreSalida=resultado.pdf" \
+  --output resultado.pdf
+
+# Obtener información en JSON
+curl -X POST "http://localhost:3000/api/unir-pdfs?formato=json" \
+  -F "archivos=@archivo1.pdf" \
+  -F "archivos=@imagen1.png" \
+  -F "nombreSalida=resultado.pdf"
+```
+
+### React (Frontend)
+
+```jsx
+import React, { useState } from 'react';
+
+function PdfMerger() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const unirPdfs = async (files) => {
+    setLoading(true);
+    setError(null);
+
+    const formData = new FormData();
+    files.forEach(file => {
+      formData.append('archivos', file);
+    });
+    formData.append('nombreSalida', 'resultado.pdf');
+
+    try {
+      const response = await fetch('http://localhost:3000/api/unir-pdfs', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al procesar');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'resultado.pdf';
+      a.click();
+      window.URL.revokeObjectURL(url);
+      
+      alert('✅ PDF descargado exitosamente!');
+    } catch (err) {
+      setError(err.message);
+      alert('❌ Error: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <input
+        type="file"
+        multiple
+        onChange={(e) => unirPdfs(Array.from(e.target.files))}
+        disabled={loading}
+      />
+      {loading && <p>Procesando...</p>}
+      {error && <p style={{color: 'red'}}>Error: {error}</p>}
+    </div>
+  );
+}
+
+export default PdfMerger;
+```
+
+### Postman
+
+1. **Método**: POST
+2. **URL**: `http://localhost:3000/api/unir-pdfs`
+3. **Body**: Selecciona `form-data`
+4. **Agregar campos**:
+   - `archivos` (tipo: File) - Selecciona múltiples archivos
+   - `nombreSalida` (tipo: Text) - Ejemplo: "resultado.pdf"
+5. **Send**: El PDF se descargará automáticamente
+
+### Variables de Entorno para Producción
+
+```bash
+# .env
+API_URL=http://localhost:3000
+# O en producción:
+# API_URL=https://tu-dominio.com
+```
+
+```javascript
+// En tu código
+const API_URL = process.env.API_URL || 'http://localhost:3000';
+const response = await fetch(`${API_URL}/api/unir-pdfs`, { ... });
+```
 
 ## 📝 Características Detalladas
 
@@ -396,7 +845,7 @@ Si es necesario, actualiza Node.js desde [nodejs.org](https://nodejs.org/).
 
 ### Error al procesar imágenes
 
-Verifica que los archivos sean imágenes válidas en formato PNG o JPEG. Algunos archivos pueden tener extensión `.jpg` pero ser de otro formato.
+Verifica que los archivos sean imágenes válidas en alguno de los formatos soportados (PNG, JPEG, GIF, BMP, WEBP, TIFF, ICO, SVG, HEIC, HEIF, AVIF). La API utiliza Sharp para convertir automáticamente cualquier formato de imagen a un formato compatible con PDF.
 
 ## 🤝 Contribuir
 
@@ -437,7 +886,7 @@ El objetivo principal es proporcionar una herramienta robusta y fácil de integr
 - ✅ Unión inteligente de múltiples archivos
 - ✅ Manejo robusto de errores y validación de archivos
 - ✅ Limpieza automática de archivos temporales
-- ✅ Soporte para múltiples formatos (PDF, PNG, JPEG)
+- ✅ Soporte para múltiples formatos de imagen: PNG, JPEG, GIF, BMP, WEBP, TIFF, ICO, SVG, HEIC, HEIF, AVIF
 - ✅ Escalado y centrado automático de imágenes
 - ✅ Documentación completa y ejemplos de uso
 

@@ -37,12 +37,24 @@ const storage = multer.diskStorage({
   }
 });
 
-// Tipos MIME permitidos
+// Tipos MIME permitidos - Todos los formatos de imagen comunes
 const tiposPermitidos = {
   'application/pdf': true,
+  // Formatos de imagen comunes
   'image/png': true,
   'image/jpeg': true,
   'image/jpg': true,
+  'image/gif': true,
+  'image/bmp': true,
+  'image/webp': true,
+  'image/tiff': true,
+  'image/tif': true,
+  'image/x-icon': true,
+  'image/vnd.microsoft.icon': true,
+  'image/svg+xml': true,
+  'image/heic': true,
+  'image/heif': true,
+  'image/avif': true,
 };
 
 const upload = multer({
@@ -51,10 +63,19 @@ const upload = multer({
     fileSize: 50 * 1024 * 1024 // 50MB máximo por archivo
   },
   fileFilter: (req, file, cb) => {
+    // Verificar por MIME type
     if (tiposPermitidos[file.mimetype]) {
       cb(null, true);
     } else {
-      cb(new Error('Solo se permiten archivos PDF, PNG o JPEG'), false);
+      // También verificar por extensión como respaldo
+      const extension = require('path').extname(file.originalname).toLowerCase();
+      const extensionesPermitidas = ['.pdf', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.tiff', '.tif', '.ico', '.svg', '.heic', '.heif', '.avif'];
+      
+      if (extensionesPermitidas.includes(extension)) {
+        cb(null, true);
+      } else {
+        cb(new Error(`Formato no soportado: ${file.mimetype || extension}. Formatos permitidos: PDF, PNG, JPEG, GIF, BMP, WEBP, TIFF, ICO, SVG, HEIC, HEIF, AVIF`), false);
+      }
     }
   }
 });
@@ -66,7 +87,7 @@ const swaggerOptions = {
     info: {
       title: 'API para Unir PDFs e Imágenes',
       version: '1.0.0',
-      description: 'API REST para unir múltiples archivos PDF e imágenes en un solo PDF. Puedes subir PDFs e imágenes (PNG, JPEG) y obtener un único archivo PDF combinado. Las imágenes se convierten automáticamente a PDF en formato A4 (escaladas y centradas manteniendo su proporción) antes de unirse.',
+      description: 'API REST para unir múltiples archivos PDF e imágenes en un solo PDF. Soporta todos los formatos de imagen comunes (PNG, JPEG, GIF, BMP, WEBP, TIFF, ICO, SVG, HEIC, HEIF, AVIF). Las imágenes se convierten automáticamente a PDF en formato A4 (escaladas y centradas manteniendo su proporción) antes de unirse.',
       contact: {
         name: 'Soporte API',
       },
@@ -102,7 +123,7 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     documentacion: '/api-docs',
     endpoint: '/api/unir-pdfs',
-    formatosSoportados: ['PDF', 'PNG', 'JPEG', 'JPG']
+    formatosSoportados: ['PDF', 'PNG', 'JPEG', 'JPG', 'GIF', 'BMP', 'WEBP', 'TIFF', 'ICO', 'SVG', 'HEIC', 'HEIF', 'AVIF']
   });
 });
 
@@ -111,7 +132,7 @@ app.get('/', (req, res) => {
  * /api/unir-pdfs:
  *   post:
  *     summary: Une múltiples archivos PDF e imágenes en uno solo
- *     description: Sube varios archivos PDF e imágenes (PNG, JPEG) y recibe un único archivo PDF combinado. Las imágenes se convierten automáticamente a PDF en formato A4 (escaladas y centradas) antes de unirse.
+ *     description: Sube varios archivos PDF e imágenes (PNG, JPEG, GIF, BMP, WEBP, TIFF, ICO, SVG, HEIC, HEIF, AVIF) y recibe un único archivo PDF combinado. Las imágenes se convierten automáticamente a PDF en formato A4 (escaladas y centradas) antes de unirse.
  *     tags: [PDFs]
  *     requestBody:
  *       required: true
@@ -127,7 +148,7 @@ app.get('/', (req, res) => {
  *                 items:
  *                   type: string
  *                   format: binary
- *                 description: Archivos PDF o imágenes (PNG, JPEG) a unir (mínimo 2, máximo 10)
+ *                 description: Archivos PDF o imágenes (PNG, JPEG, GIF, BMP, WEBP, TIFF, ICO, SVG, HEIC, HEIF, AVIF) a unir (mínimo 2, máximo 10)
  *               nombreSalida:
  *                 type: string
  *                 description: Nombre del archivo PDF resultante (opcional, por defecto "pdf-unido.pdf")
@@ -177,21 +198,27 @@ app.get('/', (req, res) => {
  *                   type: string
  *                   example: "Error al procesar los PDFs"
  */
-app.post('/api/unir-pdfs', upload.array('archivos', 10), async (req, res) => {
+app.post('/api/unir-pdfs', upload.any(), async (req, res) => {
   const pdfsTemporales = []; // Para limpiar PDFs generados de imágenes
   
   try {
+    // Filtrar solo los archivos (pueden venir como 'archivos', 'archivos[0]', 'archivos[1]', etc.)
+    const archivosSubidos = req.files.filter(file => {
+      // Aceptar campos que empiecen con 'archivos' (con o sin índices)
+      return file.fieldname === 'archivos' || file.fieldname.startsWith('archivos[');
+    });
+    
     // Validar que se hayan subido archivos
-    if (!req.files || req.files.length === 0) {
+    if (!archivosSubidos || archivosSubidos.length === 0) {
       return res.status(400).json({
         error: 'No se han subido archivos'
       });
     }
 
     // Validar que haya al menos 2 archivos
-    if (req.files.length < 2) {
+    if (archivosSubidos.length < 2) {
       // Limpiar archivos subidos
-      req.files.forEach(file => {
+      archivosSubidos.forEach(file => {
         if (fs.existsSync(file.path)) {
           fs.unlinkSync(file.path);
         }
@@ -205,7 +232,7 @@ app.post('/api/unir-pdfs', upload.array('archivos', 10), async (req, res) => {
     const archivosPdf = [];
     const archivosImagen = [];
     
-    req.files.forEach(file => {
+    archivosSubidos.forEach(file => {
       if (file.mimetype === 'application/pdf') {
         archivosPdf.push(file.path);
       } else if (file.mimetype.startsWith('image/')) {
@@ -233,7 +260,7 @@ app.post('/api/unir-pdfs', upload.array('archivos', 10), async (req, res) => {
     await unirPdfs(archivosPdf, rutaSalida);
 
     // Limpiar archivos temporales subidos (imágenes originales)
-    req.files.forEach(file => {
+    archivosSubidos.forEach(file => {
       if (fs.existsSync(file.path)) {
         fs.unlinkSync(file.path);
       }
@@ -272,8 +299,11 @@ app.post('/api/unir-pdfs', upload.array('archivos', 10), async (req, res) => {
     console.error('Error al unir PDFs e imágenes:', error);
     
     // Limpiar archivos en caso de error
-    if (req.files) {
-      req.files.forEach(file => {
+    if (req.files && req.files.length > 0) {
+      const archivosSubidos = req.files.filter(file => 
+        file.fieldname === 'archivos' || file.fieldname.startsWith('archivos[')
+      );
+      archivosSubidos.forEach(file => {
         if (fs.existsSync(file.path)) {
           fs.unlinkSync(file.path);
         }
